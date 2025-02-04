@@ -4,21 +4,15 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.graphics.RectF
-import android.util.Log
-import androidx.annotation.OptIn
 import androidx.camera.core.*
 import androidx.camera.core.ImageCapture.OnImageCapturedCallback
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import com.google.firebase.database.FirebaseDatabase
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.mfa.facedetector.MlKitAnalyzer
 import com.mfa.utils.BitmapUtils
 import java.util.concurrent.ExecutorService
@@ -103,78 +97,33 @@ class CameraManager(
     fun onTakeImage(callback: OnTakeImageCallback) {
         imageCapture.takePicture(cameraExecutor, object : OnImageCapturedCallback() {
             override fun onCaptureSuccess(imageProxy: ImageProxy) {
-                val bitmap = getBitmapFromImageProxy(imageProxy)
-                imageProxy.close()
-
-                bitmap?.let { img ->
-                    detectFace(img) { faces ->
-                        faces.firstOrNull()?.let { face ->
-                            val boundingBox = face.boundingBox
-                            Log.d("CameraManager", "Bounding Box Registrasi: $boundingBox")
-
-                            val adjustedBoundingBox = RectF(
-                                boundingBox.left.toFloat().coerceAtLeast(0f),
-                                boundingBox.top.toFloat().coerceAtLeast(0f),
-                                boundingBox.right.toFloat().coerceAtMost(img.width.toFloat()),
-                                boundingBox.bottom.toFloat().coerceAtMost(img.height.toFloat())
-                            )
-
-                            var croppedBitmap = BitmapUtils.getCropBitmapByCPU(img, adjustedBoundingBox)
-
-                            if (cameraOption == CameraSelector.LENS_FACING_FRONT) {
-                                croppedBitmap = flipBitmap(croppedBitmap)
-                            }
-
-                            croppedBitmap = Bitmap.createScaledBitmap(croppedBitmap, 256, 256, false)
-
-                            Log.d("CameraManager", "Registrasi - Ukuran Cropped Face: ${croppedBitmap.width}x${croppedBitmap.height}")
-
-                            callback.onTakeImageSuccess(croppedBitmap)
+                @SuppressLint("UnsafeOptInUsageError")
+                val image = imageProxy.image
+                if (image != null) {
+                    val sourceImageBitmap: Bitmap = BitmapUtils.convertJPEGImageProxyJPEGToBitmap(imageProxy)
+                    val imageRotation = imageProxy.imageInfo.rotationDegrees
+                    val inputImage = InputImage.fromBitmap(sourceImageBitmap, imageRotation)
+                    imageAnalyzer.detectInImage(inputImage).addOnSuccessListener {
+                        if (it.size > 0) {
+                            val face: Face = it.get(0) //Get first face from detected faces
+                            //Adjust orientation of Face
+                            val frameBitmap = BitmapUtils.rotateBitmap(sourceImageBitmap, imageRotation, false, false)
+                            //Get bounding box of face
+                            val boundingBox = RectF(face.boundingBox)
+                            //Crop out bounding box from whole Bitmap(image)
+                            var cropped_face = BitmapUtils.getCropBitmapByCPU(frameBitmap, boundingBox)
+                            if (flipX)
+                                cropped_face = BitmapUtils.rotateBitmap(cropped_face, 0, flipX, false)
+                            callback.onTakeImageSuccess(cropped_face)
                         }
                     }
                 }
             }
+
+            override fun onError(exception: ImageCaptureException) {
+                callback.onTakeImageError(exception)
+            }
         })
-    }
-
-
-    private fun detectFace(bitmap: Bitmap, onFacesDetected: (List<Face>) -> Unit) {
-        val image = InputImage.fromBitmap(bitmap, 0)
-        val faceDetector = FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                .build()
-        )
-
-        faceDetector.process(image)
-            .addOnSuccessListener { faces ->
-                onFacesDetected(faces) // Kirim wajah yang terdeteksi ke callback
-            }
-            .addOnFailureListener { e ->
-                Log.e("CameraManager", "Error saat deteksi wajah: ${e.message}")
-            }
-    }
-
-
-    @androidx.annotation.OptIn(ExperimentalGetImage::class)
-    private fun getBitmapFromImageProxy(imageProxy: ImageProxy): Bitmap? {
-        val mediaImage = imageProxy.image
-        if (mediaImage == null) {
-            Log.e("CameraManager", "Media image null!")
-            imageProxy.close()
-            return null
-        }
-
-        // Konversi dari ImageProxy ke Bitmap
-        return BitmapUtils.getBitmap(imageProxy)
-    }
-
-
-    private fun flipBitmap(bitmap: Bitmap): Bitmap {
-        val matrix = Matrix().apply { postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f) }
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     fun changeCamera() {
