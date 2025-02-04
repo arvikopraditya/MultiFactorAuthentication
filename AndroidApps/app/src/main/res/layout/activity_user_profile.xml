@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        tools:context=".activity.UserProfileActivity">
+
+        <TextView
+            android:id="@+id/txtDataWajah"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+           android:text=""
+            android:textStyle="bold"
+            />
+        <Button
+            android:id="@+id/btnFaceDetection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Rekam Wajah" />
+
+        <Button
+            android:id="@+id/btnKeluar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Logout" />
+
+        <Button
+            android:id="@+id/btnSimpanProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Simpan"
+            />
+
+        <Button
+            android:id="@+id/btn_spoof_test"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Spoof face Test"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_real_test"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="REAL face Test"
+            android:visibility="gone" />
+
+
+    </LinearLayout>
+</ScrollView>
